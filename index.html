@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADPKD Risk Assessment & Road Map</title>
+    <style>
+        /* --- Modern CSS Reset --- */
+        *, *::before, *::after { box-sizing: border-box; }
+        body, h1, h2, h3, p, ul, li { margin: 0; }
+        ul { padding: 0; list-style: none; }
+        button, input, select { font: inherit; }
+
+        /* --- CSS Variables for a Professional Theme --- */
+        :root {
+            --blue-primary: #3b82f6;
+            --blue-dark: #2563eb;
+            --grey-background: #f3f4f6;
+            --card-background: #ffffff;
+            --text-dark: #1f2937;
+            --text-light: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            
+            /* Semantic & Category Colors */
+            --green: #10b981; --green-bg: #f0fdf4;
+            --yellow: #f59e0b; --yellow-bg: #fffbeb;
+            --red: #ef4444; --red-bg: #fef2f2;
+            --pink: #ec4899; --pink-bg: #fdf2f8;
+            --teal: #14b8a6; --teal-bg: #f0fdfa;
+        }
+
+        /* --- General Body & Layout --- */
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--grey-background);
+            color: var(--text-dark);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .hero-header {
+            background-color: var(--blue-primary);
+            color: white;
+            padding: 2.5rem 1rem;
+            text-align: center;
+        }
+        .hero-header h1 { font-size: 2.25rem; font-weight: 700; }
+        .hero-header p { font-size: 1.125rem; opacity: 0.9; margin-top: 0.5rem; }
+
+        .main-container {
+            max-width: 950px;
+            margin: -2rem auto 2rem auto;
+            padding: 0 1rem;
+            position: relative;
+            z-index: 10;
+        }
+        
+        .card {
+            background-color: var(--card-background);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .card h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; }
+
+        /* --- Form Styling --- */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+        .input-group label, .radio-group-label { display: block; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-dark); }
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-group input:focus, .input-group select:focus { outline: none; border-color: var(--blue-primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        
+        .radio-group { display: flex; gap: 1rem; }
+        .radio-group label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+        .radio-group input[type="radio"] {
+            -webkit-appearance: none; appearance: none;
+            width: 1.25em; height: 1.25em;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            transition: 0.2s all linear;
+        }
+        .radio-group input[type="radio"]:checked { border: 5px solid var(--blue-primary); }
+
+        .action-button {
+            background-color: var(--blue-primary); color: white;
+            font-weight: 600; padding: 0.75rem 1.5rem;
+            border: none; border-radius: var(--radius-md);
+            cursor: pointer; transition: background-color 0.2s;
+        }
+        .action-button:hover { background-color: var(--blue-dark); }
+        .secondary-button { background-color: transparent; color: var(--blue-primary); font-weight: 600; cursor:pointer; border:none; padding: 0.5rem; }
+        
+        /* --- Previous Creatinine Entries --- */
+        #previousCreatinineList .entry { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 1rem; align-items: end; padding: 1rem 0; border-bottom: 1px solid var(--border-color); }
+        #previousCreatinineList .entry:first-child { border-top: 1px solid var(--border-color); }
+        .delete-btn { background: var(--red-bg); color: var(--red); border:none; border-radius:var(--radius-md); width: 44px; height: 44px; cursor:pointer; font-size: 1.2rem; }
+
+        /* --- Results Section --- */
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+        .egfr-display h3 { color: var(--text-light); font-weight: 500; }
+        .egfr-display .value { font-size: 2.5rem; font-weight: 700; color: var(--blue-primary); }
+        .ckd-stages-container { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .ckd-stage-pill { padding: 0.3rem 0.8rem; border-radius: 99px; font-weight: 500; border: 1px solid var(--border-color); }
+        .ckd-stage-pill.g1 { background-color: var(--green-bg); border-color: var(--green); color: var(--green); }
+        .ckd-stage-pill.g2 { background-color: var(--green-bg); border-color: var(--green); color: var(--green); }
+        .ckd-stage-pill.g3a { background-color: var(--yellow-bg); border-color: var(--yellow); color: var(--yellow); }
+        .ckd-stage-pill.g3b { background-color: var(--yellow-bg); border-color: var(--yellow); color: var(--yellow); }
+        .ckd-stage-pill.g4 { background-color: var(--red-bg); border-color: var(--red); color: var(--red); }
+        .ckd-stage-pill.g5 { background-color: var(--red-bg); border-color: var(--red); color: var(--red); }
+        .ckd-stage-pill.active { transform: scale(1.1); box-shadow: 0 0 10px rgba(0,0,0,0.1);}
+        
+        /* --- PROPKD Score Section --- */
+        .propkd-results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
+        .propkd-breakdown div { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px dashed var(--border-color); }
+        .propkd-breakdown span:last-child { font-weight: 600; }
+        .propkd-breakdown .total { font-weight: 700; color: var(--blue-primary); font-size: 1.2rem; }
+        .propkd-risk-profile { background-color: var(--grey-background); padding: 1rem; border-radius: var(--radius-md); }
+        .propkd-risk-profile .risk-level-tag { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 600; margin-bottom: 0.5rem; }
+        .propkd-risk-profile .risk-level-tag.low { background-color: var(--green-bg); color: var(--green); }
+        .propkd-risk-profile .risk-level-tag.intermediate { background-color: var(--yellow-bg); color: var(--yellow); }
+        .propkd-risk-profile .risk-level-tag.high { background-color: var(--red-bg); color: var(--red); }
+
+        /* --- Recommendations Section --- */
+        .filter-buttons { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .filter-button { background-color: var(--grey-background); color: var(--text-light); border: none; padding: 0.5rem 1rem; border-radius: 99px; cursor: pointer; font-weight: 500; }
+        .filter-button.active { background-color: var(--blue-primary); color: white; }
+        
+        .recommendation-card {
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 1rem;
+            border-left: 5px solid;
+            position: relative;
+        }
+        .recommendation-card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .recommendation-card::after { /* Category Tag */
+            content: attr(data-category);
+            position: absolute; top: 1rem; right: 1rem;
+            font-size: 0.75rem; font-weight: 500;
+            padding: 0.2rem 0.6rem;
+            border-radius: 99px;
+        }
+        /* Card Colors */
+        .recommendation-card.lifestyle { border-color: var(--green); background-color: var(--green-bg); }
+        .recommendation-card.lifestyle::after { background-color: var(--green); color: white; }
+        .recommendation-card.medical { border-color: var(--teal); background-color: var(--teal-bg); }
+        .recommendation-card.medical::after { background-color: var(--teal); color: white; }
+        .recommendation-card.pregnancy { border-color: var(--pink); background-color: var(--pink-bg); }
+        .recommendation-card.pregnancy::after { background-color: var(--pink); color: white; }
+        .recommendation-card.monitoring { border-color: var(--yellow); background-color: var(--yellow-bg); }
+        .recommendation-card.monitoring::after { background-color: var(--yellow); color: white; }
+        .recommendation-card.future { border-color: var(--red); background-color: var(--red-bg); }
+        .recommendation-card.future::after { background-color: var(--red); color: white; }
+        
+        /* --- Disclaimer --- */
+        .disclaimer { text-align: center; color: var(--text-light); font-size: 0.875rem; padding: 0 1rem; }
+
+        /* --- Responsive Adjustments --- */
+        @media (max-width: 768px) {
+            .results-grid, .propkd-results-grid { grid-template-columns: 1fr; }
+            .card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="hero-header">
+        <h1>Your ADPKD Risk Assessment & Road Map</h1>
+        <p>A personalized tool to understand and navigate your kidney health journey.</p>
+    </header>
+
+    <main class="main-container">
+        <section class="card">
+            <h2>Enter Your Information</h2>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label for="age">Age (years)</label>
+                    <input type="number" id="age" min="1" placeholder="e.g., 42">
+                </div>
+                <div class="input-group">
+                    <label class="radio-group-label">Sex</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="sex" value="male" checked> Male</label>
+                        <label><input type="radio" name="sex" value="female"> Female</label>
+                    </div>
+                </div>
+                <div class="input-group">
+                     <label for="weight">Weight (kg)</label>
+                     <input type="number" id="weight" name="weight" min="1" placeholder="e.g., 75">
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Enter Your Creatinine Values</h2>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label for="currentCreatinine">Current Creatinine (mg/dL)</label>
+                    <input type="number" id="currentCreatinine" step="0.01" min="0.1" placeholder="e.g., 1.5">
+                </div>
+                <div class="input-group">
+                    <label for="currentCreatinineMonth">Month</label>
+                    <select id="currentCreatinineMonth"></select>
+                </div>
+                <div class="input-group">
+                    <label for="currentCreatinineYear">Year</label>
+                    <select id="currentCreatinineYear"></select>
+                </div>
+            </div>
+            
+            <h3 style="margin-top: 1.5rem; font-weight:600;">Previous Creatinine Values</h3>
+            <div id="previousCreatinineList"></div>
+            <button type="button" class="secondary-button" onclick="addPreviousCreatinineEntry()">+ Add Previous Measurement</button>
+            <br>
+            <button type="button" class="action-button" onclick="calculateAndDisplay()">Calculate Kidney Health</button>
+        </section>
+
+        <section class="card" id="resultsCard" style="display: none;">
+            <h2>Your Kidney Health Snapshot</h2>
+            <div class="results-grid">
+                <div class="egfr-display">
+                    <h3>Current eGFR</h3>
+                    <p class="value" id="currentEgfrResult">-</p>
+                    <h3>Annual eGFR Decline</h3>
+                    <p class="value" id="annualEgfrDeclineResult" style="font-size: 1.8rem;">-</p>
+                    <p id="rapidProgressorAlert" style="color:var(--red); font-weight:600;"></p>
+                </div>
+                <div class="ckd-stages-display">
+                     <h3>CKD Stage</h3>
+                    <div id="ckdStagesContainer" class="ckd-stages-container">
+                        </div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="card">
+            <h2>PROPKD Risk Score Calculator</h2>
+            <p style="margin-top:-1rem; margin-bottom:1.5rem; color: var(--text-light);">This score helps predict the risk of End-Stage Renal Disease (ESRD) for patients with PKD1/PKD2 mutations.</p>
+            <div class="form-grid">
+                 <div class="input-group">
+                    <label for="hypertensionBefore35">Hypertension before age 35?</label>
+                    <select id="hypertensionBefore35">
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="urologicEventBefore35">First urologic event before age 35?*</label>
+                    <select id="urologicEventBefore35">
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                    </select>
+                </div>
+                 <div class="input-group">
+                    <label for="mutationType">Genetic Mutation Type (if known)</label>
+                    <select id="mutationType">
+                        <option value="unknown">Unknown / Not tested</option>
+                        <option value="pkd2">PKD2 mutation</option>
+                        <option value="nontrunc_pkd1">Nontruncating PKD1 mutation</option>
+                        <option value="trunc_pkd1">Truncating PKD1 mutation</option>
+                    </select>
+                </div>
+            </div>
+             <small style="display:block; margin-top: 0.5rem; color: var(--text-light);">*Urologic event: kidney infection, flank pain, hematuria, cyst hemorrhage, or kidney stone.</small>
+
+            <button type="button" class="action-button" onclick="calculateAndDisplayPROPKD()" style="margin-top:1.5rem;">Calculate PROPKD Score</button>
+            
+            <div id="propkdResultsArea" style="display:none;">
+                <div class="propkd-results-grid">
+                    <div class="propkd-breakdown">
+                        <h3>Score Calculation</h3>
+                        <div id="propkd_male"><span>Sex (Male)</span><span>-</span></div>
+                        <div id="propkd_htn"><span>Hypertension < 35y</span><span>-</span></div>
+                        <div id="propkd_event"><span>Urologic Event < 35y</span><span>-</span></div>
+                        <div id="propkd_mutation"><span>Mutation Type</span><span>-</span></div>
+                        <div><span class="total">TOTAL SCORE</span><span class="total" id="propkdScoreResult">-</span></div>
+                    </div>
+                    <div class="propkd-risk-profile">
+                        <h3>Your Risk Profile</h3>
+                        <p><span id="propkdRiskLevelTag" class="risk-level-tag">-</span></p>
+                        <p id="propkdRiskProfileResult" style="color: var(--text-light)"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card" id="recommendationsCard" style="display: none;">
+            <h2>Personalized Recommendations</h2>
+             <div class="filter-buttons" id="recommendationFilters">
+                </div>
+            <div id="recommendationsArea">
+                </div>
+        </section>
+        
+        <p class="disclaimer"><strong>Disclaimer:</strong> This tool is for educational purposes only and is not a substitute for professional medical advice. Always consult a qualified healthcare provider for diagnosis and treatment.</p>
+
+    </main>
+
+    <script>
+        // --- CONFIG & SETUP ---
+        const CURRENT_YEAR = new Date().getFullYear();
+        const CURRENT_MONTH = new Date().getMonth(); // 0-indexed
+        const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        let creatinineEntryCounter = 0;
+
+        // --- DOMContentLoaded: Initial page setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            populateDateDropdowns('currentCreatinineMonth', 'currentCreatinineYear', true);
+        });
+        
+        function populateDateDropdowns(monthId, yearId, isCurrent) {
+            const monthEl = document.getElementById(monthId);
+            const yearEl = document.getElementById(yearId);
+            
+            // Populate months
+            MONTHS.forEach((month, index) => {
+                const option = new Option(month, index);
+                monthEl.add(option);
+            });
+
+            // Populate years (last 10 years)
+            for (let i = 0; i < 10; i++) {
+                const year = CURRENT_YEAR - i;
+                const option = new Option(year, year);
+                yearEl.add(option);
+            }
+            
+            if(isCurrent) {
+                monthEl.value = CURRENT_MONTH;
+                yearEl.value = CURRENT_YEAR;
+            }
+        }
+
+        // --- DYNAMICALLY ADD/REMOVE CREATININE ENTRIES ---
+        function addPreviousCreatinineEntry() {
+            creatinineEntryCounter++;
+            const list = document.getElementById('previousCreatinineList');
+            const entry = document.createElement('div');
+            entry.className = 'entry';
+            entry.id = `entry-${creatinineEntryCounter}`;
+            entry.innerHTML = `
+                <div class="input-group">
+                    <label for="prev_creat_val_${creatinineEntryCounter}">Creatinine (mg/dL)</label>
+                    <input type="number" class="prev_creat_val" id="prev_creat_val_${creatinineEntryCounter}" step="0.01" min="0.1" placeholder="e.g., 1.2">
+                </div>
+                <div class="input-group">
+                    <label for="prev_creat_month_${creatinineEntryCounter}">Month</label>
+                    <select class="prev_creat_month" id="prev_creat_month_${creatinineEntryCounter}"></select>
+                </div>
+                <div class="input-group">
+                    <label for="prev_creat_year_${creatinineEntryCounter}">Year</label>
+                    <select class="prev_creat_year" id="prev_creat_year_${creatinineEntryCounter}"></select>
+                </div>
+                <button type="button" class="delete-btn" onclick="removeEntry('entry-${creatinineEntryCounter}')" aria-label="Remove entry">🗑️</button>
+            `;
+            list.appendChild(entry);
+            populateDateDropdowns(`prev_creat_month_${creatinineEntryCounter}`, `prev_creat_year_${creatinineEntryCounter}`, false);
+        }
+
+        function removeEntry(id) {
+            document.getElementById(id)?.remove();
+        }
+
+        // --- CORE CALCULATIONS ---
+        function calculateEGFR(creatinine, age, sex) {
+            if (isNaN(creatinine) || creatinine <= 0 || isNaN(age) || age <= 0) return NaN;
+            const kappa = (sex === 'female') ? 0.7 : 0.9;
+            const alpha = (sex === 'female') ? -0.241 : -0.302;
+            const sexFactor = (sex === 'female') ? 1.012 : 1.0;
+            const scr_div_kappa = creatinine / kappa;
+            const term1 = Math.min(scr_div_kappa, 1) ** alpha;
+            const term2 = Math.max(scr_div_kappa, 1) ** (-1.200);
+            return 142 * term1 * term2 * (0.9938 ** age) * sexFactor;
+        }
+
+        function getCKDStage(egfr) {
+            if (isNaN(egfr)) return { stage: 'N/A', description: 'Not calculated' };
+            if (egfr >= 90) return { stage: 'G1', description: 'Normal or high kidney function' };
+            if (egfr >= 60) return { stage: 'G2', description: 'Mildly decreased' };
+            if (egfr >= 45) return { stage: 'G3a', description: 'Mildly to moderately decreased' };
+            if (egfr >= 30) return { stage: 'G3b', description: 'Moderately to severely decreased' };
+            if (egfr >= 15) return { stage: 'G4', description: 'Severely decreased' };
+            return { stage: 'G5', description: 'Kidney failure' };
+        }
+        
+        function ageAtDate(currentAge, dateOfCurrentAge, pastDate) {
+            const timeDiffYears = (dateOfCurrentAge - pastDate) / (1000 * 60 * 60 * 24 * 365.25);
+            return Math.max(0, currentAge - timeDiffYears);
+        }
+
+        // --- MAIN CALCULATION & DISPLAY LOGIC ---
+        function calculateAndDisplay() {
+            const age = parseFloat(document.getElementById('age').value);
+            const sex = document.querySelector('input[name="sex"]:checked').value;
+            const currentCreatinine = parseFloat(document.getElementById('currentCreatinine').value);
+            const currentMonth = parseInt(document.getElementById('currentCreatinineMonth').value);
+            const currentYear = parseInt(document.getElementById('currentCreatinineYear').value);
+
+            if (isNaN(age) || isNaN(currentCreatinine)) {
+                alert('Please fill in Age and Current Creatinine value.');
+                return;
+            }
+            document.getElementById('resultsCard').style.display = 'block';
+            document.getElementById('recommendationsCard').style.display = 'block';
+
+            const currentDate = new Date(currentYear, currentMonth);
+            const currentEgfr = calculateEGFR(currentCreatinine, age, sex);
+            
+            // Display current eGFR & CKD Stage
+            document.getElementById('currentEgfrResult').textContent = `${currentEgfr.toFixed(1)} mL/min/1.73m²`;
+            const currentCkdStage = getCKDStage(currentEgfr);
+            renderCKDStages(currentCkdStage.stage);
+
+            // Calculate eGFR Decline
+            const allPoints = [{ egfr: currentEgfr, date: currentDate }];
+            document.querySelectorAll('#previousCreatinineList .entry').forEach(entry => {
+                const val = parseFloat(entry.querySelector('.prev_creat_val').value);
+                const month = parseInt(entry.querySelector('.prev_creat_month').value);
+                const year = parseInt(entry.querySelector('.prev_creat_year').value);
+                if (!isNaN(val)) {
+                    const pastDate = new Date(year, month);
+                    const ageThen = ageAtDate(age, currentDate, pastDate);
+                    const pastEgfr = calculateEGFR(val, ageThen, sex);
+                    allPoints.push({ egfr: pastEgfr, date: pastDate });
+                }
+            });
+
+            allPoints.sort((a, b) => a.date - b.date);
+            const declineResultEl = document.getElementById('annualEgfrDeclineResult');
+            const alertEl = document.getElementById('rapidProgressorAlert');
+            
+            if (allPoints.length >= 2) {
+                const first = allPoints[0];
+                const last = allPoints[allPoints.length - 1];
+                const timeDiffYears = (last.date - first.date) / (1000 * 60 * 60 * 24 * 365.25);
+
+                if (timeDiffYears > 0.25) { // Require at least 3 months for a meaningful decline
+                    const totalDecline = first.egfr - last.egfr;
+                    const annualDecline = totalDecline / timeDiffYears;
+                    declineResultEl.textContent = `${annualDecline.toFixed(1)} / year`;
+                    alertEl.textContent = annualDecline >= 3 ? "Potential Rapid Progressor" : "";
+                    declineResultEl.style.color = annualDecline >= 3 ? "var(--red)" : "var(--blue-primary)";
+                } else {
+                    declineResultEl.textContent = "N/A";
+                    alertEl.textContent = "Insufficient time between measurements.";
+                }
+            } else {
+                declineResultEl.textContent = "N/A";
+                alertEl.textContent = "Need at least one past value for trend.";
+            }
+            
+            // Generate recommendations based on the new results
+            generateAndDisplayRecommendations();
+        }
+
+        function renderCKDStages(activeStage) {
+            const container = document.getElementById('ckdStagesContainer');
+            container.innerHTML = '';
+            const stages = [
+                { stage: 'G1', text: 'eGFR ≥90' }, { stage: 'G2', text: 'eGFR 60-89' },
+                { stage: 'G3a', text: 'eGFR 45-59' }, { stage: 'G3b', text: 'eGFR 30-44' },
+                { stage: 'G4', text: 'eGFR 15-29' }, { stage: 'G5', text: 'eGFR <15' }
+            ];
+            stages.forEach(s => {
+                const pill = document.createElement('div');
+                pill.className = `ckd-stage-pill ${s.stage.toLowerCase()}`;
+                if (s.stage === activeStage) pill.classList.add('active');
+                pill.innerHTML = `<strong>${s.stage}</strong>: ${s.text}`;
+                container.appendChild(pill);
+            });
+        }
+        
+        // --- PROPKD SCORE ---
+        function calculateAndDisplayPROPKD() {
+            const sex = document.querySelector('input[name="sex"]:checked').value;
+            const htn = document.getElementById('hypertensionBefore35').value;
+            const event = document.getElementById('urologicEventBefore35').value;
+            const mutation = document.getElementById('mutationType').value;
+            
+            let score = 0;
+            const scores = { male: 0, htn: 0, event: 0, mutation: 0 };
+            
+            if (sex === 'male') { score += 1; scores.male = 1; }
+            if (htn === 'yes') { score += 2; scores.htn = 2; }
+            if (event === 'yes') { score += 2; scores.event = 2; }
+            if (mutation === 'nontrunc_pkd1') { score += 2; scores.mutation = 2; }
+            else if (mutation === 'trunc_pkd1') { score += 4; scores.mutation = 4; }
+            
+            document.getElementById('propkd_male').children[1].textContent = `${scores.male} points`;
+            document.getElementById('propkd_htn').children[1].textContent = `${scores.htn} points`;
+            document.getElementById('propkd_event').children[1].textContent = `${scores.event} points`;
+            document.getElementById('propkd_mutation').children[1].textContent = `${scores.mutation} points`;
+            document.getElementById('propkdScoreResult').textContent = score;
+
+            let riskProfile = '', riskClass = '';
+            if (score <= 3) { riskProfile = 'Low Risk (Median age for ESRD: ~70.6 years)'; riskClass = 'low'; }
+            else if (score <= 6) { riskProfile = 'Intermediate Risk (Median age for ESRD: ~56.9 years)'; riskClass = 'intermediate'; }
+            else { riskProfile = 'High Risk (Median age for ESRD: ~49 years)'; riskClass = 'high'; }
+
+            const tagEl = document.getElementById('propkdRiskLevelTag');
+            tagEl.textContent = riskClass.charAt(0).toUpperCase() + riskClass.slice(1) + " Risk";
+            tagEl.className = `risk-level-tag ${riskClass}`;
+            
+            let profileText = riskProfile;
+            if (mutation === 'unknown') profileText += ' *Provisional assessment as mutation type is unknown.*';
+            document.getElementById('propkdRiskProfileResult').textContent = profileText;
+            document.getElementById('propkdResultsArea').style.display = 'block';
+        }
+
+        // --- RECOMMENDATIONS ---
+        function generateAndDisplayRecommendations() {
+            const age = parseFloat(document.getElementById('age').value);
+            const weight = parseFloat(document.getElementById('weight').value);
+            const egfr = parseFloat(document.getElementById('currentEgfrResult').textContent);
+            const declineText = document.getElementById('annualEgfrDeclineResult').textContent;
+            const annualDecline = parseFloat(declineText) || 0;
+            const isRapid = annualDecline >= 3;
+            
+            let recommendations = [];
+            
+            // Lifestyle
+            let protein = "0.8-1.0 g/kg/day";
+            if (!isNaN(weight)) protein = `~${(0.8*weight).toFixed(0)}-${(1*weight).toFixed(0)} g/day`;
+            recommendations.push({ 
+                category: 'Lifestyle', 
+                title: 'Diet and Nutrition',
+                points: [`Target salt intake < 5g/day.`, `Moderate protein intake: ${protein}.`, 'Maintain adequate hydration (>2.5L/day), unless advised otherwise by your doctor.']
+            });
+            recommendations.push({ 
+                category: 'Lifestyle', 
+                title: 'Physical Activity',
+                points: ['Aim for ≥150 minutes/week of moderate-intensity activity (e.g., brisk walking, swimming).', 'Avoid high-contact sports to reduce risk of cyst rupture.']
+            });
+
+            // Medical
+            recommendations.push({ 
+                category: 'Medical', 
+                title: 'Blood Pressure Management',
+                points: ['Target blood pressure: <120/80 mmHg.', 'ACE inhibitors or ARBs are often the first-line choice.', 'Regularly monitor your BP at home.']
+            });
+            if (age >= 18 && age <= 55) {
+                if (egfr >= 25) {
+                    recommendations.push({ 
+                        category: 'Medical', 
+                        title: 'Tolvaptan Therapy',
+                        points: [`You may be a candidate for Tolvaptan, a medication that can slow kidney function decline.`, `Eligibility typically requires evidence of rapid progression (like your calculated decline rate ${isRapid ? 'of '+annualDecline.toFixed(1) : ''}) and an eGFR ≥25.`, 'Discuss the benefits and risks (especially liver monitoring) with your nephrologist.']
+                    });
+                } else {
+                     recommendations.push({ category: 'Medical', title: 'Tolvaptan Therapy', points: ['Tolvaptan is generally not initiated when eGFR falls below 25 mL/min/1.73m².'] });
+                }
+            }
+             recommendations.push({ category: 'Medical', title: 'Medication Management', points: ['Avoid NSAIDs (like ibuprofen, naproxen) as they can harm the kidneys.', 'Consult your doctor before taking any new medications or supplements.'] });
+
+            // Monitoring
+             recommendations.push({ category: 'Monitoring', title: 'Regular Follow-up', points: ['Schedule regular check-ups with your nephrologist to monitor kidney function, blood pressure, and manage complications.'] });
+
+            // Pregnancy (example)
+             recommendations.push({ category: 'Pregnancy', title: 'Pregnancy Planning', points: ['If planning a pregnancy, discuss this with your nephrology and obstetrics teams.', 'Certain medications (like ACE inhibitors, ARBs, Tolvaptan) must be stopped before conception.'] });
+
+            // Future Planning
+            if (egfr < 30) {
+                 recommendations.push({ category: 'Future', title: 'Planning for Kidney Replacement Therapy (KRT)', points: ['As eGFR approaches stage G4/G5, it is important to learn about options for KRT.', 'Discuss dialysis (hemodialysis, peritoneal dialysis) and kidney transplantation with your healthcare team to decide what is right for you.'] });
+            }
+
+            // Render the cards
+            const container = document.getElementById('recommendationsArea');
+            container.innerHTML = '';
+            recommendations.forEach(rec => {
+                const card = document.createElement('div');
+                card.className = `recommendation-card ${rec.category.toLowerCase()}`;
+                card.setAttribute('data-category', rec.category);
+                
+                let pointsHTML = '<ul>';
+                rec.points.forEach(p => { pointsHTML += `<li>${p}</li>`; });
+                pointsHTML += '</ul>';
+
+                card.innerHTML = `<h3>${rec.title}</h3>${pointsHTML}`;
+                container.appendChild(card);
+            });
+            
+            // Render filter buttons
+            const filterContainer = document.getElementById('recommendationFilters');
+            const categories = ['All', ...new Set(recommendations.map(r => r.category))];
+            filterContainer.innerHTML = '';
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = 'filter-button';
+                if(cat === 'All') btn.classList.add('active');
+                btn.textContent = cat;
+                btn.onclick = () => filterRecommendations(cat);
+                filterContainer.appendChild(btn);
+            });
+        }
+        
+        function filterRecommendations(category) {
+            // Update active button state
+            document.querySelectorAll('#recommendationFilters .filter-button').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === category);
+            });
+            
+            // Show/hide recommendation cards
+            document.querySelectorAll('.recommendation-card').forEach(card => {
+                if (category === 'All' || card.getAttribute('data-category') === category) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>
