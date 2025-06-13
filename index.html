@@ -79,18 +79,6 @@
             border-radius: 50%;
             box-shadow: 0 0 5px rgba(0,0,0,0.2);
         }
-        /* Styles for PDF report */
-        .pdf-page-break {
-            page-break-before: always;
-        }
-        /* Styling for the hidden PDF content */
-        #pdfReportContent {
-            font-family: Arial, sans-serif;
-        }
-        #pdfReportContent h1 { font-size: 16pt; font-weight: bold; }
-        #pdfReportContent h2 { font-size: 14pt; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem;}
-        #pdfReportContent h3 { font-size: 12pt; font-weight: bold; }
-        #pdfReportContent p, #pdfReportContent div, #pdfReportContent li { font-size: 12pt; }
     </style>
 </head>
 <body class="text-slate-800">
@@ -281,11 +269,6 @@
                 </div>
             </div>
         </div>
-        
-        <!-- Hidden element for PDF generation -->
-        <div id="pdfReportContainer" class="hidden">
-            <div id="pdfReportContent"></div>
-        </div>
     </main>
 
     <script>
@@ -300,17 +283,20 @@
         let creatinineEntryCounter = 0;
         
         const CATEGORY_STYLES = {
-            'Lifestyle': { color: 'green', icon: 'heart-pulse' }, 'Medical': { color: 'sky', icon: 'stethoscope' },
-            'Monitoring': { color: 'amber', icon: 'search' }, 'Complications': { color: 'orange', icon: 'shield-alert' },
-            'Pregnancy': { color: 'pink', icon: 'baby' }, 'Neurological': { color: 'indigo', icon: 'brain-circuit' },
-            'CKD Management': { color: 'purple', icon: 'clipboard-list' }
+            'Lifestyle': { color: 'green', hex: '#ECFDF5', border: '#10B981' }, 
+            'Medical': { color: 'sky', hex: '#F0F9FF', border: '#0EA5E9' },
+            'Monitoring': { color: 'amber', hex: '#FFFBEB', border: '#F59E0B' }, 
+            'Complications': { color: 'orange', hex: '#FFF7ED', border: '#F97316' },
+            'Pregnancy': { color: 'pink', hex: '#FDF2F8', border: '#EC4899' }, 
+            'Neurological': { color: 'indigo', hex: '#EEF2FF', border: '#4F46E5' },
+            'CKD Management': { color: 'purple', hex: '#F5F3FF', border: '#7C3AED' }
         };
 
         // --- RECOMMENDATION DATABASE ---
         const ALL_RECOMMENDATIONS = [
             // Lifestyle
             { category: 'Lifestyle', title: 'Physical Activity', points: ['Aim for moderate-intensity physical activity for at least 150 minutes per week.'] },
-            { category: 'Lifestyle', title: 'Alcohol Consumption', points: ['Limit alcohol to ≤1 drink/day for women or ≤2 drinks/day for men.'] },
+            { category: 'Lifestyle', title: 'Alcohol Consumption', points: ['Avoid alcohol or limit consumption to 1 drink or less per day for women and 2 drinks or less per day for men.'] },
             { category: 'Lifestyle', title: 'Diet and Nutrition', isDynamic: true, points: [] },
             { category: 'Lifestyle', title: 'Tobacco Use', points: ['Avoid smoking, as it is a strong risk factor for intracranial aneurysm (ICA) development and rupture.'] },
             // Neurological
@@ -515,7 +501,7 @@
                 },
                 options: {
                     scales: {
-                        x: { type: 'time', time: { unit: 'year', tooltipFormat: 'MMM yyyy' }, title: { display: true, text: 'Date' }},
+                        x: { type: 'time', time: { unit: 'year', tooltipFormat: 'MMMdualpr' }, title: { display: true, text: 'Date' }},
                         y: { beginAtZero: false, title: { display: true, text: 'eGFR (mL/min/1.73m²)' } }
                     },
                     plugins: { legend: { display: false }, tooltip: { callbacks: { title: (ctx) => new Date(ctx[0].parsed.x).toLocaleDateString() } } }
@@ -600,92 +586,203 @@
             generateAndDisplayRecommendations(futureData, 'recommendationsArea', 'recommendationFilters');
         }
 
-        // --- PDF DOWNLOAD (UPDATED with FONT and MARGIN control) ---
+        // --- PDF DOWNLOAD (REBUILT FOR RELIABILITY & VISUALS) ---
         async function downloadReport() {
-            const reportContentEl = document.getElementById('pdfReportContent');
-            const chartImage = egfrChartInstance.toBase64Image();
             const { name, age, egfr, ckdInfo, annualDecline, hasSufficientDataForDecline } = patientData;
-
-            // Build report HTML using standard tailwind classes that will be overridden by the specific PDF styles
-            let reportHTML = `
-                <div class="p-8 bg-white">
-                    <h1 class="text-2xl font-bold text-slate-800 mb-2">ADPKD Health Snapshot</h1>
-                    <p class="text-slate-600">Dear ${name},</p>
-                    <p class="mt-2 text-slate-500 text-xs">Here is your Kidney health snapshot and list of personalized recommendations below. Kindly discuss and confirm with your Nephrologist as these are just broad recommendations; actual and precise therapy may vary as per your overall clinical condition. Report generated on: ${new Date().toLocaleString()}</p>
-                    
-                    <div class="mt-6 grid grid-cols-2 gap-4 border-b border-t py-4 my-4">
-                        <div><strong>Patient:</strong> ${name}</div>
-                        <div><strong>Age:</strong> ${age}</div>
-                        <div><strong>Current eGFR:</strong> ${egfr.toFixed(0)} mL/min/1.73m²</div>
-                        <div><strong>CKD Stage:</strong> ${ckdInfo.stage} (${ckdInfo.description})</div>
-                        <div class="col-span-2"><strong>Calculated Annual Decline:</strong> ${hasSufficientDataForDecline ? (annualDecline.toFixed(1) + ' mL/min/year') : 'N/A (insufficient data)'}</div>
-                    </div>
-                    
-                    <h2>eGFR Trend</h2>
-                    <div style="width: 90%; margin: auto; padding-bottom: 1rem;"> 
-                        <img src="${chartImage}" style="width: 100%; border: 1px solid #ccc; border-radius: 8px;">
-                    </div>
-
-                    <div id="pdf-tolvaptan-alert" class="mt-6"></div>
-                    
-                    <div class="pdf-page-break"></div>
-
-                    <h2>Your Personalized Recommendations</h2>
-                    <div id="pdf-recs" class="space-y-4"></div>
-                </div>
-            `;
-            reportContentEl.innerHTML = reportHTML;
-            
-            generateAndDisplayRecommendations(patientData, 'pdf-recs', null);
-            
-            const pdfAlertBox = reportContentEl.querySelector('#pdf-tolvaptan-alert');
-            pdfAlertBox.innerHTML = document.getElementById('tolvaptanAlert').innerHTML;
-            lucide.createIcons({nodes: pdfAlertBox.querySelectorAll('[data-lucide]')});
-
-            const container = document.getElementById('pdfReportContainer');
-            container.classList.remove('hidden');
-
-            const canvas = await html2canvas(reportContentEl, {
-                scale: 2,
-                useCORS: true,
-                windowWidth: reportContentEl.scrollWidth,
-                windowHeight: reportContentEl.scrollHeight
-            });
-            
-            container.classList.add('hidden');
-            const imgData = canvas.toDataURL('image/png');
-
+            const chartImage = egfrChartInstance.toBase64Image('image/png', 1.0);
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            // Define margins
-            const margin = 15; // 15mm margin on all sides
-            const contentWidth = pdfWidth - (margin * 2);
-            const contentHeight = pdfHeight - (margin * 2);
+            
+            // --- CONFIG ---
+            const margin = 15;
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const contentWidth = pageWidth - (margin * 2);
+            let y = margin;
+            const lineSpacing = 6;
+            const paraSpacing = 10;
+            const lineHeightFactor = 1.4;
 
-            const imgProps = pdf.getImageProperties(imgData);
-            const imgRatio = imgProps.height / imgProps.width;
-            let imgHeightInPdf = contentWidth * imgRatio;
-            let heightLeft = imgHeightInPdf;
+            // --- HELPER FUNCTIONS ---
+            const addHeader = (isFirstPage) => {
+                pdf.setFont("helvetica", "bold");
+                pdf.setFontSize(20);
+                pdf.text("ADPKD Health Snapshot", pageWidth / 2, y, { align: 'center' });
+                y += 12;
+                 if (isFirstPage) {
+                    pdf.setDrawColor(220, 220, 220); // light grey
+                    pdf.line(margin, y, pageWidth - margin, y);
+                    y += paraSpacing;
+                }
+            };
 
-            let position = 0;
-            // Add image with margins
-            pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, imgHeightInPdf);
-            heightLeft -= contentHeight;
+            const addFooter = (pageNum) => {
+                const footerY = pageHeight - margin + 8;
+                pdf.setFont("helvetica", "normal");
+                pdf.setFontSize(9);
+                pdf.setDrawColor(220, 220, 220);
+                pdf.line(margin, pageHeight - margin, pageWidth - margin, pageHeight - margin);
+                pdf.text(`Page ${pageNum}`, pageWidth / 2, footerY, { align: 'center' });
+                pdf.text(`Report for ${name} | Generated: ${new Date().toLocaleDateString()}`, margin, footerY);
+            };
 
-            while (heightLeft > 0) {
-                position -= contentHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', margin, position + margin, contentWidth, imgHeightInPdf);
-                heightLeft -= contentHeight;
+            const checkPageBreak = (heightNeeded) => {
+                if (y + heightNeeded > pageHeight - margin) {
+                    addFooter(pdf.internal.getNumberOfPages());
+                    pdf.addPage();
+                    y = margin;
+                    addHeader(false);
+                }
+            };
+            
+            // --- PAGE 1: HEADER & SUMMARY ---
+            addHeader(true);
+
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(12);
+            const introText = `Dear ${name},\nThis is your kidney health snapshot and list of personalized recommendations. Kindly discuss these with your Nephrologist, as actual therapy may vary based on your overall clinical condition.`;
+            const splitIntro = pdf.splitTextToSize(introText, contentWidth);
+            pdf.text(splitIntro, margin, y, { lineHeightFactor: lineHeightFactor });
+            y += (splitIntro.length * lineSpacing * lineHeightFactor) + paraSpacing;
+
+            // --- Summary Section ---
+            checkPageBreak(50);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(16);
+            pdf.text("Patient Summary", margin, y);
+            y += lineSpacing + 2;
+            pdf.setDrawColor(220, 220, 220);
+            pdf.line(margin, y, contentWidth + margin, y);
+            y += paraSpacing;
+            
+            const summaryPoints = [
+                {label: "Age:", value: `${age}`},
+                {label: "Current eGFR:", value: `${egfr.toFixed(0)} mL/min/1.73m²`},
+                {label: "CKD Stage:", value: `${ckdInfo.stage} (${ckdInfo.description})`},
+                {label: "Annual Decline:", value: hasSufficientDataForDecline ? `${annualDecline.toFixed(1)} mL/min/year` : 'N/A (insufficient data)'}
+            ];
+            
+            pdf.setFontSize(12);
+            summaryPoints.forEach(point => {
+                checkPageBreak(lineSpacing * lineHeightFactor);
+                pdf.setFont("helvetica", "bold");
+                pdf.text(point.label, margin, y);
+                pdf.setFont("helvetica", "normal");
+                pdf.text(point.value, margin + 45, y);
+                y += lineSpacing * lineHeightFactor;
+            });
+            y += paraSpacing;
+
+            // --- eGFR Trend Chart ---
+            checkPageBreak(85);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(16);
+            pdf.text("eGFR Trend", margin, y);
+            y += lineSpacing;
+            const chartHeight = 70;
+            pdf.addImage(chartImage, 'PNG', margin, y, contentWidth, chartHeight);
+            y += chartHeight + paraSpacing;
+            
+            // --- Tolvaptan Alert ---
+            const tolvaptanRec = ALL_RECOMMENDATIONS.find(r => r.title === 'Tolvaptan Therapy');
+            const meetsCriteria = tolvaptanRec.condition(patientData);
+            let alertText = '';
+            let alertBgColor = '#F0F9FF'; // Default blue
+            let alertBorderColor = '#BAE6FD'; // sky-200
+            
+            if (!hasSufficientDataForDecline) {
+                alertText = 'Cannot determine eligibility for Tolvaptan. An eGFR decline rate requires at least two measurements spaced over 6 months apart.';
+                alertBgColor = '#FEFCE8'; // yellow-50
+                alertBorderColor = '#FEF08A'; // yellow-200
+            } else if (meetsCriteria) {
+                alertText = `Based on your age, eGFR of ${egfr.toFixed(0)}, and annual decline of ${patientData.annualDecline.toFixed(1)}, you meet the criteria for consideration of Tolvaptan therapy. Discuss risks and benefits with your nephrologist.`;
+                 alertBgColor = '#F0FDF4'; // green-50
+                 alertBorderColor = '#BBF7D0'; // green-200
+            } else {
+                 alertText = 'You do not currently meet the primary criteria for Tolvaptan therapy.';
             }
 
+            const splitAlert = pdf.splitTextToSize(alertText, contentWidth - 10);
+            const alertHeight = (splitAlert.length * lineSpacing * lineHeightFactor) + 20;
+            checkPageBreak(alertHeight);
+            
+            pdf.setFillColor(alertBgColor);
+            pdf.setDrawColor(alertBorderColor);
+            pdf.roundedRect(margin, y, contentWidth, alertHeight - paraSpacing, 3, 3, 'FD');
+
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(14);
+            pdf.text("Tolvaptan Therapy Alert", margin + 5, y + 8);
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(12);
+            pdf.text(splitAlert, margin + 5, y + 16, { lineHeightFactor: lineHeightFactor });
+            y += alertHeight;
+
+            // --- RECOMMENDATIONS ---
+            checkPageBreak(20);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(18);
+            pdf.text("Your Personalized Recommendations", margin, y);
+            y += paraSpacing;
+            
+            const recommendations = getFilteredRecommendations(patientData);
+            const groupedRecs = recommendations.reduce((acc, rec) => {
+                (acc[rec.category] = acc[rec.category] || []).push(rec);
+                return acc;
+            }, {});
+
+            for(const category in groupedRecs) {
+                const recs = groupedRecs[category];
+                const styles = CATEGORY_STYLES[category];
+
+                // --- 1. Calculate height for the block ---
+                let blockHeight = lineSpacing * 1.5; // Top padding
+                blockHeight += lineSpacing; // Category Title
+                blockHeight += paraSpacing / 2;
+                
+                recs.forEach(rec => {
+                     blockHeight += lineSpacing * 1.2; // Rec title height + padding
+                     const points = rec.points.map(p => `• ${p}`);
+                     const textBlock = pdf.splitTextToSize(points.join('\n'), contentWidth - 20);
+                     blockHeight += textBlock.length * lineSpacing * lineHeightFactor; // Height of points
+                     blockHeight += paraSpacing / 2; // Padding after points
+                });
+                
+                // --- 2. Check for page break and draw container ---
+                checkPageBreak(blockHeight);
+                const startY = y;
+                pdf.setFillColor(styles.hex);
+                pdf.roundedRect(margin, y, contentWidth, blockHeight, 3, 3, 'F');
+                y += paraSpacing;
+
+                // --- 3. Draw content ---
+                pdf.setFont("helvetica", "bold");
+                pdf.setFontSize(16);
+                pdf.text(category, margin + 5, y);
+                y += lineSpacing + 2;
+                
+                recs.forEach(rec => {
+                    pdf.setFont("helvetica", "bold");
+                    pdf.setFontSize(14);
+                    pdf.text(rec.title, margin + 5, y);
+                    y += lineSpacing;
+
+                    pdf.setFont("helvetica", "normal");
+                    pdf.setFontSize(12);
+                    const points = rec.points.map(p => `• ${p}`);
+                    const textBlock = pdf.splitTextToSize(points.join('\n'), contentWidth - 20);
+                    pdf.text(textBlock, margin + 10, y, { lineHeightFactor: lineHeightFactor });
+                    y += (textBlock.length * lineSpacing * lineHeightFactor) + (paraSpacing / 2);
+                });
+
+                y = startY + blockHeight + paraSpacing; // Move y to below the completed block
+            }
+            
+            addFooter(pdf.internal.getNumberOfPages());
             pdf.save(`${name}_ADPKD_Report_${new Date().toISOString().split('T')[0]}.pdf`);
         }
-
-
-        // --- RECOMMENDATION RENDERING ---
-        function generateAndDisplayRecommendations(data, areaId, filterId) {
+        
+        // --- Helper to get recommendations for both UI and PDF ---
+        function getFilteredRecommendations(data) {
             let recommendations = ALL_RECOMMENDATIONS.filter(rec => {
                 const stage = data.ckdStage;
                 const minStageOk = !rec.minStage || stage >= rec.minStage;
@@ -694,62 +791,50 @@
                 const conditionOk = !rec.condition || rec.condition(data);
                 return minStageOk && maxStageOk && sexOk && conditionOk;
             });
-            
-            recommendations.forEach(rec => {
-                if (rec.title === 'Diet and Nutrition') {
-                    const protein = isNaN(data.weight) ? "0.8-1.0 g/kg/day" : `~${(0.8*data.weight).toFixed(0)}-${(1.0*data.weight).toFixed(0)} g/day`;
-                    rec.points = [`Water intake: Aim for >2-3 liters/day, especially if on Tolvaptan.`, `Salt intake: Limit to <5 g/day (<2g sodium).`, `Protein intake: ${protein}.`];
-                }
-                if (rec.title === 'Blood Pressure Management') {
-                     let target = '<130/80 mm Hg';
-                    if (data.age >= 18 && data.age <= 50 && data.ckdStage <= 1) {
-                        target = '≤110/75 mm Hg';
+             recommendations.forEach(rec => {
+                if (rec.isDynamic) {
+                    if (rec.title === 'Diet and Nutrition') {
+                        const protein = isNaN(data.weight) ? "0.8-1.0 g/kg/day" : `~${(0.8*data.weight).toFixed(0)}-${(1.0*data.weight).toFixed(0)} g/day`;
+                        rec.points = [`Water intake: Aim for >2-3 liters/day, especially if on Tolvaptan.`, `Salt intake: Limit to <5 g/day (<2g sodium).`, `Protein intake: ${protein}.`];
                     }
-                    rec.points = [`For your profile, a target BP of ${target} is suggested.`, 'ACE inhibitors or ARBs are the recommended first-line treatment.'];
+                    if (rec.title === 'Blood Pressure Management') {
+                        let target = '<130/80 mm Hg';
+                        if (data.age >= 18 && data.age <= 50 && data.ckdStage <= 1) {
+                            target = '≤110/75 mm Hg';
+                        }
+                        rec.points = [`For your profile, a target BP of ${target} is suggested.`, 'ACE inhibitors or ARBs are the recommended first-line treatment.'];
+                    }
                 }
             });
+            return recommendations;
+        }
 
+        // --- RECOMMENDATION RENDERING (for UI only) ---
+        function generateAndDisplayRecommendations(data, areaId, filterId) {
+            const recommendations = getFilteredRecommendations(data);
             const container = document.getElementById(areaId);
             container.innerHTML = '';
             
-            const groupedRecs = recommendations.reduce((acc, rec) => {
-                (acc[rec.category] = acc[rec.category] || []).push(rec);
-                return acc;
-            }, {});
+            recommendations.forEach(rec => {
+                 const styles = CATEGORY_STYLES[rec.category] || { color: 'slate', icon: 'info' };
+                 const card = document.createElement('div');
+                 card.className = `recommendation-card border-l-4 p-4 bg-${styles.hex} border-${styles.border} rounded-r-lg shadow-sm`;
+                 card.setAttribute('data-category', rec.category);
+                 
+                 let pointsHTML = `<ul class="mt-3 ml-1 space-y-2 text-slate-700 list-disc list-inside">${rec.points.map(p => `<li>${p}</li>`).join('')}</ul>`;
+                 if (rec.subPoints) {
+                     pointsHTML += `<div class="mt-3 ml-1 text-xs text-slate-600">${rec.subPoints.join('<br>')}</div>`;
+                 }
 
-            Object.entries(groupedRecs).forEach(([category, recs]) => {
-                 const styles = CATEGORY_STYLES[category] || { color: 'slate', icon: 'info' };
-                 recs.forEach(rec => {
-                    // When generating for PDF, use PDF-specific heading tags
-                    const isPdf = areaId === 'pdf-recs';
-                    const titleTag = isPdf ? 'h3' : 'h3';
-                    const categoryClass = isPdf ? '' : `text-xs font-semibold uppercase text-${styles.color}-600 bg-${styles.color}-200 px-2 py-1 rounded-full`;
-
-                    const card = document.createElement('div');
-                    card.className = isPdf ? 'mb-4' : `recommendation-card border-l-4 p-4 bg-${styles.color}-50 border-${styles.color}-400 rounded-r-lg`;
-                    card.setAttribute('data-category', rec.category);
-                    
-                    let pointsHTML = `<ul class="mt-3 ml-4 space-y-2 list-disc">${rec.points.map(p => `<li>${p}</li>`).join('')}</ul>`;
-                    if (rec.subPoints) {
-                        pointsHTML += `<div class="mt-3 ml-4 text-xs">${rec.subPoints.join('<br>')}</div>`;
-                    }
-
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start">
-                           <${titleTag} class="${isPdf ? '' : `text-lg font-bold text-${styles.color}-800 flex items-center gap-2`}"><i data-lucide="${styles.icon}" class="w-5 h-5 inline-block mr-2"></i>${rec.title}</${titleTag}>
-                           <span class="${categoryClass}">${isPdf ? '' : rec.category}</span>
-                        </div>
-                        ${pointsHTML}`;
-                    container.appendChild(card);
-                 });
+                 card.innerHTML = `
+                     <div class="flex justify-between items-start">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i data-lucide="${rec.icon || styles.icon}" style="color:${styles.border}"></i>${rec.title}</h3>
+                        <span class="text-xs font-semibold uppercase text-slate-600 bg-slate-200 px-2 py-1 rounded-full">${rec.category}</span>
+                     </div>
+                     ${pointsHTML}`;
+                 container.appendChild(card);
             });
-
-            if (!container.querySelector('[data-lucide]')) {
-                 lucide.createIcons();
-            } else {
-                 lucide.createIcons({nodes: container.querySelectorAll('[data-lucide]')});
-            }
-
+            lucide.createIcons();
 
             if (filterId) { 
                 const filterContainer = document.getElementById(filterId);
@@ -763,7 +848,7 @@
                     if(cat === 'All') {
                         btn.className += ' active bg-blue-600 text-white';
                     } else {
-                        btn.className += ` text-${styles.color}-700 bg-${styles.color}-100 hover:bg-${styles.color}-200`;
+                         btn.className += ` text-slate-700 bg-white hover:bg-slate-100 border border-slate-300`;
                     }
                     btn.textContent = cat;
                     btn.onclick = () => filterRecommendations(cat);
@@ -775,21 +860,16 @@
         function filterRecommendations(category) {
             document.querySelectorAll('#recommendationFilters .filter-button').forEach(btn => {
                 const btnCat = btn.dataset.category;
-                const styles = CATEGORY_STYLES[btnCat] || { color: 'slate' };
                 const isActive = btnCat === category;
                 
                 btn.classList.toggle('active', isActive);
-                btn.classList.toggle('bg-blue-600', isActive && btnCat === 'All');
-                btn.classList.toggle('text-white', isActive);
-                btn.classList.toggle(`bg-${styles.color}-600`, isActive && btnCat !== 'All');
-                
-                if (!isActive) {
-                    if (btnCat === 'All') {
-                        btn.className = 'filter-button text-sm font-semibold px-4 py-2 rounded-full transition-colors focus-ring text-slate-700 bg-slate-100 hover:bg-slate-200';
-                    } else {
-                        btn.classList.remove(`bg-${styles.color}-600`, 'text-white');
-                        btn.classList.add(`text-${styles.color}-700`, `bg-${styles.color}-100`, `hover:bg-${styles.color}-200`);
-                    }
+                if(btnCat === 'All') {
+                    btn.classList.toggle('bg-blue-600', isActive);
+                    btn.classList.toggle('text-white', isActive);
+                } else {
+                    const styles = CATEGORY_STYLES[btnCat] || { color: 'slate' };
+                    btn.classList.toggle(`bg-${styles.hex.replace('#', '')}`, isActive); // a bit hacky for color
+                    btn.classList.toggle(`border-transparent`, isActive);
                 }
             });
 
@@ -801,3 +881,4 @@
     </script>
 </body>
 </html>
+
