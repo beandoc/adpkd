@@ -55,10 +55,12 @@
             width: 100%;
             height: 12px;
             border-radius: 6px;
-            background: linear-gradient(to right, #ef4444, #f59e0b, #eab308, #84cc16, #22c55e);
+             /* Green to Red gradient */
+            background: linear-gradient(to right, #22c55e, #84cc16, #eab308, #f59e0b, #ef4444);
             outline: none;
             opacity: 0.9;
             transition: opacity .2s;
+            direction: rtl; /* Makes slider move left-to-right for decreasing values */
         }
         #egfrSlider::-webkit-slider-thumb {
             -webkit-appearance: none; appearance: none;
@@ -77,6 +79,18 @@
             border-radius: 50%;
             box-shadow: 0 0 5px rgba(0,0,0,0.2);
         }
+        /* Styles for PDF report */
+        .pdf-page-break {
+            page-break-before: always;
+        }
+        /* Styling for the hidden PDF content */
+        #pdfReportContent {
+            font-family: Arial, sans-serif;
+        }
+        #pdfReportContent h1 { font-size: 16pt; font-weight: bold; }
+        #pdfReportContent h2 { font-size: 14pt; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem;}
+        #pdfReportContent h3 { font-size: 12pt; font-weight: bold; }
+        #pdfReportContent p, #pdfReportContent div, #pdfReportContent li { font-size: 12pt; }
     </style>
 </head>
 <body class="text-slate-800">
@@ -127,6 +141,7 @@
                 <!-- Creatinine Values Card -->
                 <div class="bg-white p-6 rounded-xl shadow-lg">
                     <h2 class="text-xl font-bold flex items-center gap-3"><i data-lucide="beaker"></i>Creatinine Values</h2>
+                    <p class="text-xs text-slate-500 mt-1">Enter at least two values (current and one past) to calculate your eGFR decline rate.</p>
                     <div class="mt-6 space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-slate-600 mb-1">Current Creatinine (mg/dL)</label>
@@ -203,6 +218,8 @@
                          <h3 class="font-semibold text-slate-600 mb-2">eGFR Trend</h3>
                          <div class="bg-slate-50 p-2 rounded-lg"><canvas id="egfrChart"></canvas></div>
                     </div>
+                     <!-- Tolvaptan Alert -->
+                    <div id="tolvaptanAlert" class="mt-6 border-2 border-blue-400 bg-blue-50 p-4 rounded-lg hidden"></div>
                      <!-- CKD Stage Display -->
                     <div class="mt-6">
                         <h3 class="font-semibold text-slate-600 mb-2">Chronic Kidney Disease (CKD) Stage</h3>
@@ -234,15 +251,18 @@
                 <!-- Future Scenario Planner -->
                 <div id="futureScenarioCard" class="bg-white p-6 rounded-xl shadow-lg hidden">
                     <h2 class="text-xl font-bold flex items-center gap-3"><i data-lucide="line-chart"></i>Explore Future Scenarios</h2>
-                    <p class="text-sm text-slate-500 mt-2">Move the slider to see how your recommendations may change as eGFR changes over time.</p>
+                    <p class="text-sm text-slate-500 mt-2">Move the slider to see how your recommendations may change as eGFR changes over time. The slider starts at your current eGFR and can only be moved to lower values.</p>
                     <div class="mt-4">
-                        <input type="range" min="10" max="100" value="90" id="egfrSlider">
+                        <input type="range" min="5" max="95" value="95" id="egfrSlider">
                         <div class="flex justify-between text-xs font-medium text-slate-500 mt-1">
-                            <span>CKD G5 (&lt;15)</span>
-                            <span>CKD G3</span>
                             <span>CKD G1 (≥90)</span>
+                            <span>CKD G2</span>
+                            <span>CKD G3a</span>
+                            <span>CKD G3b</span>
+                            <span>CKD G4</span>
+                            <span>CKD G5 (&lt;15)</span>
                         </div>
-                        <p class="text-center font-semibold mt-2">Future eGFR: <span id="sliderValue" class="text-blue-600">90</span> mL/min/1.73m²</p>
+                        <p class="text-center font-semibold mt-2">Future eGFR: <span id="sliderValue" class="text-blue-600">95</span> mL/min/1.73m²</p>
                     </div>
                 </div>
 
@@ -257,13 +277,15 @@
 
                  <!-- Disclaimer -->
                 <div class="text-center text-xs text-slate-500 p-4">
-                    <strong>Disclaimer:</strong> This tool is for educational purposes only and does not constitute medical advice. Always consult with qualified healthcare professionals.
+                    <strong>Disclaimer:</strong> Recommendations are based on current KDIGO (Kidney Disease: Improving Global Outcomes) guidelines for ADPKD and other cited research. This tool is for educational and informational purposes only and does not constitute medical advice. Always consult with qualified healthcare professionals for medical decisions and patient-specific management, as they can consider your individual medical history and clinical condition.
                 </div>
             </div>
         </div>
         
         <!-- Hidden element for PDF generation -->
-        <div id="pdfReport" class="hidden"></div>
+        <div id="pdfReportContainer" class="hidden">
+            <div id="pdfReportContent"></div>
+        </div>
     </main>
 
     <script>
@@ -274,14 +296,17 @@
         const CURRENT_YEAR = new Date().getFullYear();
         const CURRENT_MONTH = new Date().getMonth();
         const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        let lastEnteredDate = new Date();
         let creatinineEntryCounter = 0;
         
         const CATEGORY_STYLES = {
             'Lifestyle': { color: 'green', icon: 'heart-pulse' }, 'Medical': { color: 'sky', icon: 'stethoscope' },
             'Monitoring': { color: 'amber', icon: 'search' }, 'Complications': { color: 'orange', icon: 'shield-alert' },
             'Pregnancy': { color: 'pink', icon: 'baby' }, 'Neurological': { color: 'indigo', icon: 'brain-circuit' },
+            'CKD Management': { color: 'purple', icon: 'clipboard-list' }
         };
-        // --- UPDATED RECOMMENDATION DATABASE ---
+
+        // --- RECOMMENDATION DATABASE ---
         const ALL_RECOMMENDATIONS = [
             // Lifestyle
             { category: 'Lifestyle', title: 'Physical Activity', points: ['Aim for moderate-intensity physical activity for at least 150 minutes per week.'] },
@@ -295,8 +320,23 @@
             { category: 'Monitoring', title: 'Living Donor Considerations', points: ['It is crucial to exclude the diagnosis of ADPKD in potential living-related kidney donors.'] },
             // Medical
             { category: 'Medical', title: 'Blood Pressure Management', isDynamic: true, points: [] },
-            { category: 'Medical', title: 'Tolvaptan Therapy', condition: (d) => d.age >= 18 && d.age <= 55 && d.egfr >= 25 && d.isRapidProgressor, points: ['As you meet the criteria for rapidly progressive disease, initiating Tolvaptan is recommended to slow eGFR decline.', 'Initial dose: 45mg (waking) and 15mg (8 hours later).', 'Goal dose: 90mg (waking) and 30mg (8 hours later), as tolerated.', 'Contraindications include: elevated liver enzymes, volume depletion, hypernatraemia, inability to sense thirst, pregnancy, breastfeeding, or anuria.'] },
-            { category: 'Medical', title: 'CKD Management', minStage: 3.1, points: ['Hypoxia-inducible factor-prolyl hydroxylase inhibitors (HIF-PHIs) should not be used to manage anemia in ADPKD patients not on dialysis.', 'Sodium-glucose cotransporter-2 inhibitors (SGLT2i) are not currently recommended for managing diabetes in ADPKD.'] },
+            { category: 'Medical', title: 'Tolvaptan Therapy', condition: (d) => d.age >= 18 && d.age <= 55 && d.egfr >= 25 && d.isRapidProgressor, 
+                points: [
+                    'As you meet the primary criteria for rapidly progressive disease, initiating Tolvaptan may be recommended to slow eGFR decline.',
+                    'Contraindications include: elevated liver enzymes, volume depletion, hypernatraemia, inability to sense thirst, pregnancy, breastfeeding, or anuria.'
+                ],
+                subPoints: [
+                    '<strong>Additional considerations supporting therapy:</strong>',
+                    'Kidney length ≥ 16.5 cm (in ages ≤ 46)',
+                    'Total Kidney Volume (TKV) ≥ 750 ml (in ages ≤ 50)',
+                    'Mayo Imaging Class 1C, 1D, or 1E',
+                    'PROPKD Score > 6'
+                ]
+            },
+            // CKD Management Recommendations by Stage
+            { category: 'CKD Management', title: 'CKD Stage 3 Management', minStage: 3.1, maxStage: 3.2, points: ['Regular monitoring of electrolytes, calcium, and phosphorus.', 'Consider vitamin D supplementation if deficient.', 'Anemia management (avoid HIF-PHIs).', 'Avoid nephrotoxic medications including NSAIDs.', 'Management of diabetes should follow CKD guidelines (avoid SGLT2 inhibitors).'] },
+            { category: 'CKD Management', title: 'CKD Stage 4 Preparation', minStage: 4, maxStage: 4, points: ['Discussion about kidney replacement therapy options (dialysis, transplant).', 'Evaluation of potential living kidney donors.', 'Recommended vaccinations (Hepatitis B, pneumococcal, influenza).', 'Consider vascular access planning if dialysis is anticipated.', 'Nutritional counseling with a renal dietitian.'] },
+            { category: 'CKD Management', title: 'CKD Stage 5 (Kidney Failure) Management', minStage: 5, maxStage: 5, points: ['Preparation for dialysis or transplantation.', 'Vascular access creation (fistula or graft) for hemodialysis.', 'Peritoneal dialysis catheter placement if choosing PD.', 'Transplant evaluation and waitlist registration.', 'Symptom management for uremia.', 'Palliative care discussion if appropriate.'] },
             // Complications
             { category: 'Complications', title: 'Nephrolithiasis (Kidney Stones)', points: ['If you have a history of kidney stones, a 24-hour urinary test is recommended.', 'All stone formers should aim for a daily urine output of 2.5 L/day.', 'Asymptomatic hyperuricemia should not be treated.'] },
             { category: 'Complications', title: 'Hematuria (Blood in Urine)', points: ['Gross hematuria can be alarming but is often manageable. Counseling and reassurance are key first steps.'] },
@@ -310,31 +350,36 @@
         // --- PAGE INITIALIZATION ---
         window.onload = () => {
             lucide.createIcons();
-            populateDateDropdowns('currentCreatinineMonth', 'currentCreatinineYear', true);
+            lastEnteredDate = new Date();
+            populateDateDropdowns('currentCreatinineMonth', 'currentCreatinineYear', lastEnteredDate.getMonth(), lastEnteredDate.getFullYear());
             document.getElementById('egfrSlider').addEventListener('input', updateRecommendationsForSlider);
         };
         
-        function populateDateDropdowns(monthId, yearId, isCurrent) {
+        function populateDateDropdowns(monthId, yearId, selectedMonth, selectedYear) {
             const monthEl = document.getElementById(monthId);
             const yearEl = document.getElementById(yearId);
+            monthEl.innerHTML = '';
+            yearEl.innerHTML = '';
             MONTHS.forEach((month, index) => monthEl.add(new Option(month, index)));
-            for (let i = 0; i < 40; i++) yearEl.add(new Option(CURRENT_YEAR - i, CURRENT_YEAR - i));
-            if(isCurrent) {
-                monthEl.value = CURRENT_MONTH;
-                yearEl.value = CURRENT_YEAR;
-            }
+            for (let i = 0; i < 50; i++) yearEl.add(new Option(CURRENT_YEAR - i, CURRENT_YEAR - i));
+            
+            monthEl.value = selectedMonth;
+            yearEl.value = selectedYear;
         }
         
         // --- DYNAMICALLY ADD/REMOVE CREATININE ENTRIES ---
         function addPreviousCreatinineEntry() {
             creatinineEntryCounter++;
             const list = document.getElementById('previousCreatinineList');
+            
+            lastEnteredDate.setFullYear(lastEnteredDate.getFullYear() - 1);
+
             const entry = document.createElement('div');
             entry.className = 'grid grid-cols-12 gap-2 items-center';
             entry.id = `entry-${creatinineEntryCounter}`;
-            entry.innerHTML = `<input type="number" class="prev_creat_val col-span-5 p-2 border rounded-lg" id="prev_creat_val_${creatinineEntryCounter}" placeholder="Value"><select class="prev_creat_month col-span-3 p-2 border rounded-lg" id="prev_creat_month_${creatinineEntryCounter}"></select><select class="prev_creat_year col-span-3 p-2 border rounded-lg" id="prev_creat_year_${creatinineEntryCounter}"></select><button type="button" class="col-span-1 text-red-500" onclick="removeEntry('entry-${creatinineEntryCounter}')"><i data-lucide="x-circle" class="w-5 h-5"></i></button>`;
+            entry.innerHTML = `<input type="number" step="0.01" class="prev_creat_val col-span-5 p-2 border rounded-lg" id="prev_creat_val_${creatinineEntryCounter}" placeholder="Value"><select class="prev_creat_month col-span-3 p-2 border rounded-lg" id="prev_creat_month_${creatinineEntryCounter}"></select><select class="prev_creat_year col-span-3 p-2 border rounded-lg" id="prev_creat_year_${creatinineEntryCounter}"></select><button type="button" class="col-span-1 text-red-500 hover:text-red-700" onclick="removeEntry('entry-${creatinineEntryCounter}')"><i data-lucide="x-circle" class="w-5 h-5"></i></button>`;
             list.appendChild(entry);
-            populateDateDropdowns(`prev_creat_month_${creatinineEntryCounter}`, `prev_creat_year_${creatinineEntryCounter}`, false);
+            populateDateDropdowns(`prev_creat_month_${creatinineEntryCounter}`, `prev_creat_year_${creatinineEntryCounter}`, lastEnteredDate.getMonth(), lastEnteredDate.getFullYear());
             lucide.createIcons();
         }
         function removeEntry(id) { document.getElementById(id)?.remove(); }
@@ -342,15 +387,20 @@
         // --- CORE CALCULATIONS ---
         function calculateEGFR(creatinine, age, sex) {
             if (isNaN(creatinine) || creatinine <= 0 || isNaN(age) || age <= 0) return NaN;
-            const k = (sex === 'female') ? 0.7 : 0.9, a = (sex === 'female') ? -0.241 : -0.302, f = (sex === 'female') ? 1.012 : 1;
-            return 142 * Math.min(creatinine / k, 1) ** a * Math.max(creatinine / k, 1) ** -1.2 * 0.9938 ** age * f;
+            const k = (sex === 'female') ? 0.7 : 0.9;
+            const a = (sex === 'female') ? -0.241 : -0.302;
+            const f = (sex === 'female') ? 1.012 : 1;
+            return 142 * Math.pow(Math.min(creatinine / k, 1), a) * Math.pow(Math.max(creatinine / k, 1), -1.200) * Math.pow(0.9938, age) * f;
         }
 
         function getCKDStageInfo(egfr) {
-            if (isNaN(egfr)) return { stage: 'N/A', num: 0, color: 'slate' };
-            if (egfr >= 90) return { stage: 'G1', num: 1, color: 'green' }; if (egfr >= 60) return { stage: 'G2', num: 2, color: 'lime' };
-            if (egfr >= 45) return { stage: 'G3a', num: 3.1, color: 'yellow' }; if (egfr >= 30) return { stage: 'G3b', num: 3.2, color: 'amber' };
-            if (egfr >= 15) return { stage: 'G4', num: 4, color: 'orange' }; return { stage: 'G5', num: 5, color: 'red' };
+            if (isNaN(egfr)) return { stage: 'N/A', num: 0, color: 'slate', description: 'Not Available' };
+            if (egfr >= 90) return { stage: 'G1', num: 1, color: 'green', description: 'Normal or high' }; 
+            if (egfr >= 60) return { stage: 'G2', num: 2, color: 'lime', description: 'Mildly decreased' };
+            if (egfr >= 45) return { stage: 'G3a', num: 3.1, color: 'yellow', description: 'Mildly to moderately decreased' }; 
+            if (egfr >= 30) return { stage: 'G3b', num: 3.2, color: 'amber', description: 'Moderately to severely decreased' };
+            if (egfr >= 15) return { stage: 'G4', num: 4, color: 'orange', description: 'Severely decreased' }; 
+            return { stage: 'G5', num: 5, color: 'red', description: 'Kidney failure' };
         }
         
         // --- MAIN CALCULATION & DISPLAY LOGIC ---
@@ -362,51 +412,68 @@
             const currentMonth = parseInt(document.getElementById('currentCreatinineMonth').value);
             const currentYear = parseInt(document.getElementById('currentCreatinineYear').value);
 
-            if (isNaN(age) || isNaN(currentCreatinine) || !name) { alert('Please fill in Patient Name, Age, and Current Creatinine.'); return; }
+            if (isNaN(age) || isNaN(currentCreatinine) || !name) { 
+                alert('Please fill in Patient Name, Age, and Current Creatinine.'); 
+                return; 
+            }
 
             const currentDate = new Date(currentYear, currentMonth);
             const currentEgfr = calculateEGFR(currentCreatinine, age, sex);
             
-            const allPoints = [{ date: currentDate, value: currentEgfr }];
+            let allPoints = [{ date: currentDate, value: currentEgfr, creatinine: currentCreatinine }];
             document.querySelectorAll('#previousCreatinineList .grid').forEach(entry => {
                 const val = parseFloat(entry.querySelector('.prev_creat_val').value);
                 const month = parseInt(entry.querySelector('.prev_creat_month').value);
                 const year = parseInt(entry.querySelector('.prev_creat_year').value);
                 if (!isNaN(val) && val > 0) {
                     const pastDate = new Date(year, month);
-                    const ageAtPastDate = age - (currentDate - pastDate) / 31557600000;
-                    allPoints.push({ date: pastDate, value: calculateEGFR(val, ageAtPastDate, sex) });
+                    const ageAtPastDate = age - (currentDate.getTime() - pastDate.getTime()) / (1000 * 3600 * 24 * 365.25);
+                    allPoints.push({ date: pastDate, value: calculateEGFR(val, ageAtPastDate, sex), creatinine: val });
                 }
             });
             allPoints.sort((a, b) => a.date - b.date);
 
-            let annualDecline = NaN, isRapidProgressor = false;
+            let annualDecline = NaN, isRapidProgressor = false, hasSufficientDataForDecline = false;
             const declineResultEl = document.getElementById('annualEgfrDeclineResult');
             const alertEl = document.getElementById('rapidProgressorAlert');
             if (allPoints.length >= 2) {
                 const first = allPoints[0], last = allPoints[allPoints.length - 1];
-                const timeDiffYears = (last.date - first.date) / 31557600000;
-                if (timeDiffYears >= 0.5) {
+                const timeDiffYears = (last.date - first.date) / (1000 * 3600 * 24 * 365.25);
+                
+                if (timeDiffYears >= 0.5) { 
+                    hasSufficientDataForDecline = true;
                     annualDecline = (first.value - last.value) / timeDiffYears;
                     declineResultEl.textContent = `${annualDecline.toFixed(1)} / year`;
                     isRapidProgressor = annualDecline >= 3.0;
-                    alertEl.textContent = isRapidProgressor ? "Potential Rapid Progressor" : "Stable Progression";
+                    alertEl.textContent = isRapidProgressor ? "Rapid Progression Detected" : "Stable Progression";
                     alertEl.className = `text-sm h-5 mt-1 font-semibold ${isRapidProgressor ? 'text-red-600' : 'text-green-600'}`;
                 } else {
-                    declineResultEl.textContent = "N/A"; alertEl.textContent = "More time needed for trend.";
+                    declineResultEl.textContent = "N/A"; alertEl.textContent = "Data span < 6 months"; alertEl.className = 'text-sm h-5 mt-1 font-semibold text-slate-500';
                 }
             } else {
-                declineResultEl.textContent = "N/A"; alertEl.textContent = "Add past values for trend.";
+                declineResultEl.textContent = "N/A"; alertEl.textContent = "Add past values for trend."; alertEl.className = 'text-sm h-5 mt-1 font-semibold text-slate-500';
             }
 
             const currentCkdInfo = getCKDStageInfo(currentEgfr);
             
-            patientData = { name, age, sex, weight: parseFloat(document.getElementById('weight').value), egfr: currentEgfr, ckdStage: currentCkdInfo.num, ckdInfo: currentCkdInfo, annualDecline, isRapidProgressor, allPoints };
+            patientData = { name, age, sex, weight: parseFloat(document.getElementById('weight').value), egfr: currentEgfr, ckdStage: currentCkdInfo.num, ckdInfo: currentCkdInfo, annualDecline, isRapidProgressor, allPoints, hasSufficientDataForDecline };
             
             document.getElementById('currentEgfrResult').textContent = currentEgfr.toFixed(0);
             renderCKDStages(currentCkdInfo.stage);
             drawEgfrChart(allPoints);
             calculateAndDisplayPROPKD();
+            displayTolvaptanAlert();
+            
+            // Setup slider based on current eGFR
+            const slider = document.getElementById('egfrSlider');
+            const currentEgfrRounded = Math.max(5, Math.ceil(currentEgfr));
+            slider.max = currentEgfrRounded;
+            slider.value = currentEgfrRounded;
+            document.getElementById('sliderValue').textContent = currentEgfrRounded;
+            
+            // Set initial recommendations
+            document.getElementById('recommendationsTitle').innerHTML = `<i data-lucide="map"></i>Your Personalized Road Map`;
+            lucide.createIcons();
             generateAndDisplayRecommendations(patientData, 'recommendationsArea', 'recommendationFilters');
             
             // Show result cards
@@ -423,7 +490,7 @@
                 { stage: 'G3b', text: '30-44' }, { stage: 'G4', text: '15-29' }, { stage: 'G5', text: '<15' }
             ].forEach(s => {
                 const isActive = s.stage === activeStage;
-                const ckdInfo = getCKDStageInfo(parseFloat(s.text.replace('≥','').replace('<','')));
+                const ckdInfo = getCKDStageInfo(parseFloat(s.text.replace(/[^0-9.]/g, '')));
                 const pill = document.createElement('div');
                 pill.className = `text-center p-2 rounded-lg border-2 flex-grow ${isActive ? `bg-${ckdInfo.color}-100 border-${ckdInfo.color}-500 scale-110 shadow-lg` : `bg-white border-slate-200`}`;
                 pill.innerHTML = `<div class="font-bold text-lg text-slate-800">${s.stage}</div><div class="text-xs text-slate-500">${s.text}</div>`;
@@ -443,15 +510,15 @@
                         borderColor: '#3b82f6',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         fill: true,
-                        tension: 0.1
+                        tension: 0.2
                     }]
                 },
                 options: {
                     scales: {
-                        x: { type: 'time', time: { unit: 'year' } },
-                        y: { title: { display: true, text: 'eGFR' } }
+                        x: { type: 'time', time: { unit: 'year', tooltipFormat: 'MMM yyyy' }, title: { display: true, text: 'Date' }},
+                        y: { beginAtZero: false, title: { display: true, text: 'eGFR (mL/min/1.73m²)' } }
                     },
-                    plugins: { legend: { display: false } }
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { title: (ctx) => new Date(ctx[0].parsed.x).toLocaleDateString() } } }
                 }
             });
         }
@@ -477,9 +544,9 @@
             document.getElementById('propkdScoreResult').textContent = score;
 
             let riskProfile = '', riskClass = '', riskColor = '';
-            if (score <= 3) { riskProfile = 'Median ESKD age: ~71y'; riskClass = 'Low Risk'; riskColor = 'green'; }
-            else if (score <= 6) { riskProfile = 'Median ESKD age: ~57y'; riskClass = 'Intermediate Risk'; riskColor = 'amber'; }
-            else { riskProfile = 'Median ESKD age: ~49y'; riskClass = 'High Risk'; riskColor = 'red'; }
+            if (score <= 3) { riskProfile = 'Median age at ESKD: ~71y'; riskClass = 'Low Risk'; riskColor = 'green'; }
+            else if (score <= 6) { riskProfile = 'Median age at ESKD: ~57y'; riskClass = 'Intermediate Risk'; riskColor = 'amber'; }
+            else { riskProfile = 'Median age at ESKD: ~49y'; riskClass = 'High Risk'; riskColor = 'red'; }
             
             const tagEl = document.getElementById('propkdRiskLevelTag');
             tagEl.textContent = riskClass;
@@ -495,99 +562,209 @@
             document.getElementById('propkdResultsArea').classList.remove('hidden');
         }
 
+        function displayTolvaptanAlert() {
+            const alertBox = document.getElementById('tolvaptanAlert');
+            const { age, egfr, isRapidProgressor, hasSufficientDataForDecline } = patientData;
+            
+            const tolvaptanRec = ALL_RECOMMENDATIONS.find(r => r.title === 'Tolvaptan Therapy');
+            const meetsCriteria = tolvaptanRec.condition(patientData);
+
+            let alertHTML = `<h3 class="font-bold text-lg text-blue-800 flex items-center gap-2"><i data-lucide="alert-triangle"></i>Tolvaptan Therapy Alert</h3>`;
+
+            if (!hasSufficientDataForDecline) {
+                 alertHTML += `<p class="mt-2 text-sm text-slate-700">Cannot determine eligibility for Tolvaptan. An eGFR decline rate requires at least two measurements spaced over 6 months apart. Please enter sufficient historical data.</p>`;
+            } else if (meetsCriteria) {
+                alertHTML += `<p class="mt-2 text-sm text-green-800 font-semibold">Based on your age, eGFR of ${egfr.toFixed(0)}, and annual decline of ${patientData.annualDecline.toFixed(1)}, you meet the criteria for consideration of Tolvaptan therapy.</p>`;
+                alertHTML += `<p class="mt-2 text-xs text-slate-600">This therapy is recommended to slow kidney function decline in eligible patients. Discuss the risks and benefits with your nephrologist.</p>`;
+            } else {
+                let reason = [];
+                if (age < 18 || age > 55) reason.push(`age is outside the 18-55 range`);
+                if (egfr < 25) reason.push(`eGFR is below 25`);
+                if (!isRapidProgressor) reason.push(`annual eGFR decline is less than 3 mL/min`);
+                alertHTML += `<p class="mt-2 text-sm text-slate-700">You do not currently meet the primary criteria for Tolvaptan therapy. Reason(s): ${reason.join(', ')}.</p>`;
+            }
+            
+            alertBox.innerHTML = alertHTML;
+            alertBox.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+
         function updateRecommendationsForSlider(event) {
             const sliderValue = parseInt(event.target.value);
             document.getElementById('sliderValue').textContent = sliderValue;
             const futureCkdInfo = getCKDStageInfo(sliderValue);
             const futureData = { ...patientData, egfr: sliderValue, ckdStage: futureCkdInfo.num };
-            document.getElementById('recommendationsTitle').innerHTML = `<i data-lucide="line-chart"></i>Future Scenario at eGFR ${sliderValue}`;
+            document.getElementById('recommendationsTitle').innerHTML = `<i data-lucide="line-chart"></i>Road Map for a Future eGFR of ${sliderValue}`;
             lucide.createIcons();
             generateAndDisplayRecommendations(futureData, 'recommendationsArea', 'recommendationFilters');
         }
 
-        // --- PDF DOWNLOAD ---
+        // --- PDF DOWNLOAD (UPDATED with FONT and MARGIN control) ---
         async function downloadReport() {
-            const reportEl = document.getElementById('pdfReport');
+            const reportContentEl = document.getElementById('pdfReportContent');
             const chartImage = egfrChartInstance.toBase64Image();
-            
-            // Build report HTML
-            reportEl.innerHTML = `
-                <div class="p-8 font-sans text-sm bg-white">
-                    <h1 class="text-2xl font-bold text-slate-800">ADPKD Health Snapshot</h1>
-                    <p class="text-slate-500">Generated on: ${new Date().toLocaleString()}</p>
-                    <div class="mt-6 grid grid-cols-2 gap-4 border-b pb-4 mb-4">
-                        <div><strong class="font-semibold text-slate-600">Patient:</strong> ${patientData.name}</div>
-                        <div><strong class="font-semibold text-slate-600">Age:</strong> ${patientData.age}</div>
-                        <div><strong class="font-semibold text-slate-600">eGFR:</strong> ${patientData.egfr.toFixed(0)} mL/min/1.73m²</div>
-                        <div><strong class="font-semibold text-slate-600">CKD Stage:</strong> ${patientData.ckdInfo.stage}</div>
-                        <div class="col-span-2"><strong class="font-semibold text-slate-600">Annual Decline:</strong> ${isNaN(patientData.annualDecline) ? 'N/A' : patientData.annualDecline.toFixed(1) + ' / year'}</div>
+            const { name, age, egfr, ckdInfo, annualDecline, hasSufficientDataForDecline } = patientData;
+
+            // Build report HTML using standard tailwind classes that will be overridden by the specific PDF styles
+            let reportHTML = `
+                <div class="p-8 bg-white">
+                    <h1 class="text-2xl font-bold text-slate-800 mb-2">ADPKD Health Snapshot</h1>
+                    <p class="text-slate-600">Dear ${name},</p>
+                    <p class="mt-2 text-slate-500 text-xs">Here is your Kidney health snapshot and list of personalized recommendations below. Kindly discuss and confirm with your Nephrologist as these are just broad recommendations; actual and precise therapy may vary as per your overall clinical condition. Report generated on: ${new Date().toLocaleString()}</p>
+                    
+                    <div class="mt-6 grid grid-cols-2 gap-4 border-b border-t py-4 my-4">
+                        <div><strong>Patient:</strong> ${name}</div>
+                        <div><strong>Age:</strong> ${age}</div>
+                        <div><strong>Current eGFR:</strong> ${egfr.toFixed(0)} mL/min/1.73m²</div>
+                        <div><strong>CKD Stage:</strong> ${ckdInfo.stage} (${ckdInfo.description})</div>
+                        <div class="col-span-2"><strong>Calculated Annual Decline:</strong> ${hasSufficientDataForDecline ? (annualDecline.toFixed(1) + ' mL/min/year') : 'N/A (insufficient data)'}</div>
                     </div>
-                    <h2 class="text-xl font-bold mt-6 mb-2 text-slate-700">eGFR Trend</h2>
-                    <img src="${chartImage}" class="w-full border rounded-lg">
-                    <h2 class="text-xl font-bold mt-6 mb-2 text-slate-700">Personalized Recommendations</h2>
+                    
+                    <h2>eGFR Trend</h2>
+                    <div style="width: 90%; margin: auto; padding-bottom: 1rem;"> 
+                        <img src="${chartImage}" style="width: 100%; border: 1px solid #ccc; border-radius: 8px;">
+                    </div>
+
+                    <div id="pdf-tolvaptan-alert" class="mt-6"></div>
+                    
+                    <div class="pdf-page-break"></div>
+
+                    <h2>Your Personalized Recommendations</h2>
                     <div id="pdf-recs" class="space-y-4"></div>
                 </div>
             `;
-            // Populate recommendations for the PDF
-            generateAndDisplayRecommendations(patientData, 'pdf-recs', null); // null filterId to skip filter buttons
+            reportContentEl.innerHTML = reportHTML;
             
-            reportEl.classList.remove('hidden');
-            const canvas = await html2canvas(reportEl, { scale: 2 });
-            reportEl.classList.add('hidden');
+            generateAndDisplayRecommendations(patientData, 'pdf-recs', null);
+            
+            const pdfAlertBox = reportContentEl.querySelector('#pdf-tolvaptan-alert');
+            pdfAlertBox.innerHTML = document.getElementById('tolvaptanAlert').innerHTML;
+            lucide.createIcons({nodes: pdfAlertBox.querySelectorAll('[data-lucide]')});
+
+            const container = document.getElementById('pdfReportContainer');
+            container.classList.remove('hidden');
+
+            const canvas = await html2canvas(reportContentEl, {
+                scale: 2,
+                useCORS: true,
+                windowWidth: reportContentEl.scrollWidth,
+                windowHeight: reportContentEl.scrollHeight
+            });
+            
+            container.classList.add('hidden');
             const imgData = canvas.toDataURL('image/png');
 
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
             const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`${patientData.name}_ADPKD_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            // Define margins
+            const margin = 15; // 15mm margin on all sides
+            const contentWidth = pdfWidth - (margin * 2);
+            const contentHeight = pdfHeight - (margin * 2);
+
+            const imgProps = pdf.getImageProperties(imgData);
+            const imgRatio = imgProps.height / imgProps.width;
+            let imgHeightInPdf = contentWidth * imgRatio;
+            let heightLeft = imgHeightInPdf;
+
+            let position = 0;
+            // Add image with margins
+            pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, imgHeightInPdf);
+            heightLeft -= contentHeight;
+
+            while (heightLeft > 0) {
+                position -= contentHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', margin, position + margin, contentWidth, imgHeightInPdf);
+                heightLeft -= contentHeight;
+            }
+
+            pdf.save(`${name}_ADPKD_Report_${new Date().toISOString().split('T')[0]}.pdf`);
         }
+
 
         // --- RECOMMENDATION RENDERING ---
         function generateAndDisplayRecommendations(data, areaId, filterId) {
             let recommendations = ALL_RECOMMENDATIONS.filter(rec => {
-                const minStageOk = !rec.minStage || data.ckdStage >= rec.minStage;
+                const stage = data.ckdStage;
+                const minStageOk = !rec.minStage || stage >= rec.minStage;
+                const maxStageOk = !rec.maxStage || stage <= rec.maxStage;
                 const sexOk = !rec.sex || rec.sex === data.sex;
                 const conditionOk = !rec.condition || rec.condition(data);
-                return minStageOk && sexOk && conditionOk;
+                return minStageOk && maxStageOk && sexOk && conditionOk;
             });
+            
             recommendations.forEach(rec => {
                 if (rec.title === 'Diet and Nutrition') {
                     const protein = isNaN(data.weight) ? "0.8-1.0 g/kg/day" : `~${(0.8*data.weight).toFixed(0)}-${(1.0*data.weight).toFixed(0)} g/day`;
-                    rec.points = [`Water intake: Aim for >2 liters/day.`, `Salt intake: Limit to <5 g/day.`, `Protein intake: ${protein}.`];
+                    rec.points = [`Water intake: Aim for >2-3 liters/day, especially if on Tolvaptan.`, `Salt intake: Limit to <5 g/day (<2g sodium).`, `Protein intake: ${protein}.`];
                 }
                 if (rec.title === 'Blood Pressure Management') {
-                    if (data.age >= 18 && data.age <= 49 && data.ckdStage <= 2) {
-                        rec.points = ['For your age and CKD stage, a target BP of ≤110/75 mm Hg is suggested.'];
-                    } else if (data.age >= 50 && data.ckdStage >= 3.1) {
-                        rec.points = ['For your age and CKD stage, a target systolic BP of <120 mm Hg is suggested.'];
-                    } else {
-                        rec.points = ['A general target BP of <120/80 mm Hg is recommended.'];
+                     let target = '<130/80 mm Hg';
+                    if (data.age >= 18 && data.age <= 50 && data.ckdStage <= 1) {
+                        target = '≤110/75 mm Hg';
                     }
+                    rec.points = [`For your profile, a target BP of ${target} is suggested.`, 'ACE inhibitors or ARBs are the recommended first-line treatment.'];
                 }
             });
+
             const container = document.getElementById(areaId);
             container.innerHTML = '';
-            recommendations.forEach(rec => {
-                const styles = CATEGORY_STYLES[rec.category] || { color: 'slate', icon: 'info' };
-                const card = document.createElement('div');
-                card.className = `recommendation-card border-l-4 p-4 bg-${styles.color}-50 border-${styles.color}-400 rounded-r-lg`;
-                card.setAttribute('data-category', rec.category);
-                card.innerHTML = `<div class="flex justify-between items-start"><h3 class="text-lg font-bold text-${styles.color}-800 flex items-center gap-2"><i data-lucide="${styles.icon}" class="w-5 h-5"></i>${rec.title}</h3><span class="text-xs font-semibold uppercase text-${styles.color}-600 bg-${styles.color}-200 px-2 py-1 rounded-full">${rec.category}</span></div><ul class="mt-3 ml-1 space-y-2 text-slate-700 list-disc list-inside">${rec.points.map(p => `<li>${p}</li>`).join('')}</ul>`;
-                container.appendChild(card);
-            });
-            lucide.createIcons();
+            
+            const groupedRecs = recommendations.reduce((acc, rec) => {
+                (acc[rec.category] = acc[rec.category] || []).push(rec);
+                return acc;
+            }, {});
 
-            if (filterId) { // Only create filters if a filterId is provided
+            Object.entries(groupedRecs).forEach(([category, recs]) => {
+                 const styles = CATEGORY_STYLES[category] || { color: 'slate', icon: 'info' };
+                 recs.forEach(rec => {
+                    // When generating for PDF, use PDF-specific heading tags
+                    const isPdf = areaId === 'pdf-recs';
+                    const titleTag = isPdf ? 'h3' : 'h3';
+                    const categoryClass = isPdf ? '' : `text-xs font-semibold uppercase text-${styles.color}-600 bg-${styles.color}-200 px-2 py-1 rounded-full`;
+
+                    const card = document.createElement('div');
+                    card.className = isPdf ? 'mb-4' : `recommendation-card border-l-4 p-4 bg-${styles.color}-50 border-${styles.color}-400 rounded-r-lg`;
+                    card.setAttribute('data-category', rec.category);
+                    
+                    let pointsHTML = `<ul class="mt-3 ml-4 space-y-2 list-disc">${rec.points.map(p => `<li>${p}</li>`).join('')}</ul>`;
+                    if (rec.subPoints) {
+                        pointsHTML += `<div class="mt-3 ml-4 text-xs">${rec.subPoints.join('<br>')}</div>`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                           <${titleTag} class="${isPdf ? '' : `text-lg font-bold text-${styles.color}-800 flex items-center gap-2`}"><i data-lucide="${styles.icon}" class="w-5 h-5 inline-block mr-2"></i>${rec.title}</${titleTag}>
+                           <span class="${categoryClass}">${isPdf ? '' : rec.category}</span>
+                        </div>
+                        ${pointsHTML}`;
+                    container.appendChild(card);
+                 });
+            });
+
+            if (!container.querySelector('[data-lucide]')) {
+                 lucide.createIcons();
+            } else {
+                 lucide.createIcons({nodes: container.querySelectorAll('[data-lucide]')});
+            }
+
+
+            if (filterId) { 
                 const filterContainer = document.getElementById(filterId);
                 const categories = ['All', ...new Set(recommendations.map(r => r.category))];
                 filterContainer.innerHTML = '';
                 categories.forEach(cat => {
                     const styles = CATEGORY_STYLES[cat] || { color: 'slate' };
                     const btn = document.createElement('button');
-                    btn.className = 'filter-button text-sm font-semibold px-4 py-2 rounded-full transition-colors';
-                    if(cat === 'All') btn.className += ' active bg-blue-600 text-white';
-                    else btn.className += ` text-${styles.color}-700 bg-${styles.color}-100 hover:bg-${styles.color}-200`;
+                    btn.className = 'filter-button text-sm font-semibold px-4 py-2 rounded-full transition-colors focus-ring';
+                    btn.dataset.category = cat;
+                    if(cat === 'All') {
+                        btn.className += ' active bg-blue-600 text-white';
+                    } else {
+                        btn.className += ` text-${styles.color}-700 bg-${styles.color}-100 hover:bg-${styles.color}-200`;
+                    }
                     btn.textContent = cat;
                     btn.onclick = () => filterRecommendations(cat);
                     filterContainer.appendChild(btn);
@@ -597,21 +774,22 @@
         }
         function filterRecommendations(category) {
             document.querySelectorAll('#recommendationFilters .filter-button').forEach(btn => {
-                const btnCat = btn.textContent;
+                const btnCat = btn.dataset.category;
                 const styles = CATEGORY_STYLES[btnCat] || { color: 'slate' };
                 const isActive = btnCat === category;
                 
-                btn.classList.remove('active', 'bg-blue-600', 'text-white', `bg-${styles.color}-600`, `text-${styles.color}-700`, `bg-${styles.color}-100`);
-                if (isActive) {
+                btn.classList.toggle('active', isActive);
+                btn.classList.toggle('bg-blue-600', isActive && btnCat === 'All');
+                btn.classList.toggle('text-white', isActive);
+                btn.classList.toggle(`bg-${styles.color}-600`, isActive && btnCat !== 'All');
+                
+                if (!isActive) {
                     if (btnCat === 'All') {
-                        btn.classList.add('active', 'bg-blue-600', 'text-white');
+                        btn.className = 'filter-button text-sm font-semibold px-4 py-2 rounded-full transition-colors focus-ring text-slate-700 bg-slate-100 hover:bg-slate-200';
                     } else {
-                        btn.classList.add('active', `bg-${styles.color}-600`, 'text-white');
+                        btn.classList.remove(`bg-${styles.color}-600`, 'text-white');
+                        btn.classList.add(`text-${styles.color}-700`, `bg-${styles.color}-100`, `hover:bg-${styles.color}-200`);
                     }
-                } else {
-                     if (btnCat !== 'All') {
-                        btn.classList.add(`text-${styles.color}-700`, `bg-${styles.color}-100`);
-                     }
                 }
             });
 
